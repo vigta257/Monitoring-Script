@@ -30,8 +30,10 @@ new_entries = []
 # Function to get file details
 def get_file_details(file_path):
     size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    # Get the file creation or modification time
+    file_time = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d')
     return {
-        'Date': datetime.now().strftime('%Y-%m-%d'),  # Only the date
+        'Date': file_time,  # File creation or modification date
         'Folder': os.path.basename(os.path.dirname(file_path)),  # Parent directory name
         'File Name': os.path.basename(file_path),
         'File Size (MB)': size_mb
