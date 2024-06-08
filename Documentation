@@ -1,2 +1,11 @@
-Stepp 1: Install python
+#Install Python
+
+
+# Install Pandas
+pip install pandas
+
+
+# Add backup-script.py to your desired location
+# Make the file executable
+chmod +x backup-script.py
 
