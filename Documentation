@@ -1,4 +1,7 @@
 #Install Python
+sudo dnf install python3
+sudo dnf install python3-pip
+
 
 
 # Install Pandas
