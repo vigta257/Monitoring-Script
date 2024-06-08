@@ -10,9 +10,10 @@ folders = [
     '/home/victor/config_dir/facility_4'
 ]
 
-# Define the output CSV file
-output_file = 'Monitoring.csv'
-log_file = 'log.csv'
+# Define the output directory and CSV files
+output_dir = '/home/victor/config_dir'
+output_file = os.path.join(output_dir, 'Monitoring.csv')
+log_file = os.path.join(output_dir, 'log.csv')
 
 # Load existing data if the file exists
 if os.path.exists(output_file):
@@ -69,4 +70,5 @@ df.to_csv(output_file, index=False)
 # Write log message
 write_log("Monitoring complete. Data written to Monitoring.csv")
 
+# Print the log message (optional)
 #print("Monitoring complete. Data written to Monitoring.csv")
