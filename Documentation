@@ -12,3 +12,42 @@ pip install pandas
 # Make the file executable
 chmod +x backup-script.py
 
+
+#########################################
+Process for Using Grafana
+
+#Add Grafana’s YUM repository:
+sudo nano /etc/yum.repos.d/grafana.repo
+
+
+
+#Install grafana
+sudo dnf install grafana
+
+
+
+# Start and enable grafana service
+sudo systemctl start grafana-server
+sudo systemctl enable grafana-server
+
+
+# Access grafana
+http://localhost:3000
+
+
+##########################################
+Preparing CSV Data for Grafana
+
+
+# Download, extract and navigate into the Prometheus directory
+tar -xzvf prometheus-*.linux-amd64.tar.gz
+cd prometheus-*.linux-amd64
+
+
+# Install prometheus_client library
+pip3 install prometheus_client
+
+
+
+
+
