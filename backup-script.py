@@ -1,5 +1,5 @@
 import os
-import pandas as pd
+import psycopg2
 from datetime import datetime
 
 # Define the folders to monitor
@@ -10,67 +10,92 @@ folders = [
     '/home/victor/config_dir/facility_4'
 ]
 
-# Define the output directory and CSV files
-output_dir = '/home/victor/config_dir'
-output_file = os.path.join(output_dir, 'Monitoring.csv')
-log_file = os.path.join(output_dir, 'log.csv')
+# Database connection parameters
+db_params = {
+    'dbname': 'monitoring',
+    'user': 'postgres',
+    'password': 'postgres',
+    'host': '192.168.0.110',
+    'port': 5432
+}
 
-# Load existing data if the file exists
-if os.path.exists(output_file):
-    df = pd.read_csv(output_file)
-else:
-    df = pd.DataFrame(columns=['Date', 'Folder', 'File Name', 'File Size (MB)'])
+# Log file path
+log_file_path = '/home/victor/config_dir/log_file.log'  # Specify the path to your log file
 
-# Initialize a set to store known files
-known_files = set(df['File Name'])
+# Function to write log messages to a file
+def write_log(message):
+    log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with open(log_file_path, 'a') as log_file:
+        log_file.write(f"[{log_time}] {message}\n")
 
-# List to collect new file details
-new_entries = []
+# Connect to the database
+try:
+    conn = psycopg2.connect(**db_params)
+    cur = conn.cursor()
+    write_log("Connected to the database successfully.")
+except Exception as e:
+    write_log(f"Failed to connect to the database: {str(e)}")
+    exit()
+
+# Create table if it doesn't exist, with 'read_time' column after 'date'
+cur.execute("""
+    CREATE TABLE IF NOT EXISTS folder_monitoring (
+        id SERIAL PRIMARY KEY,
+        date DATE,
+        read_time TIME,
+        folder VARCHAR(255),
+        file_name VARCHAR(255),
+        file_size_mb FLOAT
+    )
+""")
+conn.commit()
 
 # Function to get file details
 def get_file_details(file_path):
-    size_mb = os.path.getsize(file_path) / (1024 * 1024)
-    # Get the file creation or modification time
-    file_time = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d')
-    return {
-        'Date': file_time,  # File creation or modification date
-        'Folder': os.path.basename(os.path.dirname(file_path)),  # Parent directory name
-        'File Name': os.path.basename(file_path),
-        'File Size (MB)': size_mb
-    }
-
-# Function to write log messages
-def write_log(message):
-    log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    log_entry = {'Timestamp': log_time, 'Message': message}
-    if os.path.exists(log_file):
-        log_df = pd.read_csv(log_file)
-    else:
-        log_df = pd.DataFrame(columns=['Timestamp', 'Message'])
-    log_df = pd.concat([log_df, pd.DataFrame([log_entry])], ignore_index=True)
-    log_df.to_csv(log_file, index=False)
+    try:
+        size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        creation_time = datetime.fromtimestamp(os.path.getctime(file_path))  # Get file creation time
+        file_date = creation_time.strftime('%Y-%m-%d')  # Extract the date part
+        file_time = creation_time.strftime('%H:%M:%S')  # Extract the time part
+        return {
+            'date': file_date,
+            'read_time': file_time,
+            'folder': os.path.basename(os.path.dirname(file_path)),
+            'file_name': os.path.basename(file_path),
+            'file_size_mb': size_mb
+        }
+    except Exception as e:
+        write_log(f"Error getting details for {file_path}: {str(e)}")
+        return None
 
 # Check for new files in each folder
 for folder in folders:
     for root, dirs, files in os.walk(folder):
         for file in files:
             file_path = os.path.join(root, file)
-            if file not in known_files:
-                file_details = get_file_details(file_path)
-                new_entries.append(file_details)
-                known_files.add(file)
+            try:
+                cur.execute("SELECT 1 FROM folder_monitoring WHERE file_name = %s", (file,))
+                if cur.fetchone() is None:
+                    file_details = get_file_details(file_path)
+                    if file_details:
+                        cur.execute("""
+                            INSERT INTO folder_monitoring (date, read_time, folder, file_name, file_size_mb)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            file_details['date'],
+                            file_details['read_time'],
+                            file_details['folder'],
+                            file_details['file_name'],
+                            file_details['file_size_mb']
+                        ))
+                        conn.commit()
+                        write_log(f"Inserted: {file_details}")
+            except Exception as e:
+                write_log(f"Database error for file {file}: {str(e)}")
 
-# Create a DataFrame from the new entries
-if new_entries:
-    new_entries_df = pd.DataFrame(new_entries)
-    # Concatenate the existing DataFrame with the new entries DataFrame
-    df = pd.concat([df, new_entries_df], ignore_index=True)
-
-# Write updated data to the CSV file
-df.to_csv(output_file, index=False)
+# Close the database connection
+cur.close()
+conn.close()
 
 # Write log message
-write_log("Monitoring complete. Data written to Monitoring.csv")
-
-# Print the log message (optional)
-#print("Monitoring complete. Data written to Monitoring.csv")
+write_log("Monitoring complete. Data written to database")
